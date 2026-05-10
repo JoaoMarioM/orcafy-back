@@ -1,0 +1,57 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String     @id @default(uuid())
+  email     String     @unique
+  password  String
+  name      String?
+  settings  Setting?
+  materials Material[]
+  budgets   Budget[]
+}
+
+model Setting {
+  id            String @id @default(uuid())
+  defaultMargin Float  @default(30)
+  defaultExtras Float  @default(0)
+  userId        String @unique
+  user          User   @relation(fields: [userId], references: [id])
+}
+
+model Material {
+  id              String  @id @default(uuid())
+  name            String
+  thickness       Int
+  pricePerM2      Float
+  sheetArea       Float?
+  chargeFullSheet Boolean @default(false)
+  sheetWidth      Float?
+  sheetLength     Float?
+  sheetPrice      Float?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+}
+
+model Budget {
+  id        String   @id @default(uuid())
+  client    String
+  total     Float
+  margin    Float
+  extras    Float
+  status    String   @default("rascunho")
+  createdAt DateTime @default(now())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  modules   Json
+}
