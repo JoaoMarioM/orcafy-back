@@ -1,17 +1,23 @@
 {
   "name": "orcaFy-back",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Backend do projeto orcaFy",
+  "main": "dist/server.js",
   "scripts": {
     "dev": "ts-node-dev src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
     "test": "vitest run",
     "test:watch": "vitest"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "packageManager": "pnpm@11.0.9",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma"
+    ]
+  },
   "dependencies": {
     "@prisma/client": "^5.22.0",
     "bcryptjs": "^3.0.3",
