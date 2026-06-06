@@ -1,29 +1,65 @@
 {
   "_type": "export",
   "__export_format": 4,
-  "__export_date": "2026-05-02T12:00:00.000Z",
+  "__export_date": "2026-05-21T12:00:00.000Z",
   "__export_source": "insomnia.desktop.app:v8.0.0",
   "resources": [
     {
-      "_id": "wrk_marcenaria_mvp",
+      "_id": "wrk_orcafy_mvp",
       "_type": "workspace",
-      "name": "App Marcenaria (MVP) - Completo"
+      "name": "Orçafy API - MVP (CRM Atualizado)",
+      "description": "Collection oficial com a nova arquitetura de Clientes."
     },
     {
       "_id": "env_base",
       "_type": "environment",
-      "parentId": "wrk_marcenaria_mvp",
+      "parentId": "wrk_orcafy_mvp",
       "name": "Base Environment",
+      "data": {}
+    },
+    {
+      "_id": "env_prod",
+      "_type": "environment",
+      "parentId": "env_base",
+      "name": "PROD",
       "data": {
-        "base_url": "http://localhost:3333",
-        "token": "COLE_SEU_TOKEN_JWT_AQUI"
+        "base_url": "https://orcafy-back.vercel.app",
+        "token": ""
+      }
+    },
+    {
+      "_id": "env_local",
+      "_type": "environment",
+      "parentId": "env_base",
+      "name": "LOCAL",
+      "data": {
+        "base_url": "http://localhost:3000",
+        "token": ""
       }
     },
     {
       "_id": "fld_auth",
       "_type": "request_group",
-      "parentId": "wrk_marcenaria_mvp",
+      "parentId": "wrk_orcafy_mvp",
       "name": "1. Autenticação"
+    },
+    {
+      "_id": "fld_clients",
+      "_type": "request_group",
+      "parentId": "wrk_orcafy_mvp",
+      "name": "2. Clientes (CRM)"
+    },
+    {
+      "_id": "fld_materials",
+      "_type": "request_group",
+      "parentId": "wrk_orcafy_mvp",
+      "name": "3. Materiais"
+    },
+    {
+      "_id": "fld_budgets",
+      "_type": "request_group",
+      "parentId": "wrk_orcafy_mvp",
+      "name": "4. Motor de Orçamentos"
     },
     {
       "_id": "req_register",
@@ -31,10 +67,10 @@
       "parentId": "fld_auth",
       "name": "Cadastro de Marceneiro",
       "method": "POST",
-      "url": "{{ _.base_url }}/users",
+      "url": "{{ _.base_url }}/auth/register",
       "body": {
         "mimeType": "application/json",
-        "text": "{\n\t\"name\": \"João\",\n\t\"email\": \"joao@omni.com\",\n\t\"password\": \"123456\"\n}"
+        "text": "{\n\t\"name\": \"João Mário\",\n\t\"email\": \"joao@omni.com\",\n\t\"password\": \"123456\"\n}"
       },
       "headers": [
         { "name": "Content-Type", "value": "application/json" }
@@ -46,7 +82,7 @@
       "parentId": "fld_auth",
       "name": "Login",
       "method": "POST",
-      "url": "{{ _.base_url }}/sessions",
+      "url": "{{ _.base_url }}/auth/login",
       "body": {
         "mimeType": "application/json",
         "text": "{\n\t\"email\": \"joao@omni.com\",\n\t\"password\": \"123456\"\n}"
@@ -56,16 +92,48 @@
       ]
     },
     {
-      "_id": "fld_materials",
-      "_type": "request_group",
-      "parentId": "wrk_marcenaria_mvp",
-      "name": "2. Materiais"
+      "_id": "req_create_client",
+      "_type": "request",
+      "parentId": "fld_clients",
+      "name": "Criar Cliente",
+      "method": "POST",
+      "url": "{{ _.base_url }}/clients",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n\t\"name\": \"Arquiteta Carla\",\n\t\"email\": \"carla@arquitetura.com\",\n\t\"phone\": \"11999998888\"\n}"
+      },
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "Authorization", "value": "Bearer {{ _.token }}" }
+      ]
     },
     {
-      "_id": "req_mat_giro",
+      "_id": "req_list_clients",
+      "_type": "request",
+      "parentId": "fld_clients",
+      "name": "Listar Clientes",
+      "method": "GET",
+      "url": "{{ _.base_url }}/clients",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ _.token }}" }
+      ]
+    },
+    {
+      "_id": "req_get_client",
+      "_type": "request",
+      "parentId": "fld_clients",
+      "name": "Buscar Cliente por ID",
+      "method": "GET",
+      "url": "{{ _.base_url }}/clients/COLE_O_ID_DO_CLIENTE_AQUI",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ _.token }}" }
+      ]
+    },
+    {
+      "_id": "req_create_material",
       "_type": "request",
       "parentId": "fld_materials",
-      "name": "Criar Material (Giro / Comum)",
+      "name": "Criar Material (Giro)",
       "method": "POST",
       "url": "{{ _.base_url }}/materials",
       "body": {
@@ -78,29 +146,18 @@
       ]
     },
     {
-      "_id": "req_mat_especifico",
+      "_id": "req_list_materials",
       "_type": "request",
       "parentId": "fld_materials",
-      "name": "Criar Material (Específico / Chapa Inteira)",
-      "method": "POST",
+      "name": "Listar Materiais",
+      "method": "GET",
       "url": "{{ _.base_url }}/materials",
-      "body": {
-        "mimeType": "application/json",
-        "text": "{\n\t\"name\": \"MDF Carvalho Avelã 15mm\",\n\t\"thickness\": 15,\n\t\"sheetWidth\": 2750,\n\t\"sheetLength\": 1840,\n\t\"sheetPrice\": 565.90,\n\t\"chargeFullSheet\": true\n}"
-      },
       "headers": [
-        { "name": "Content-Type", "value": "application/json" },
         { "name": "Authorization", "value": "Bearer {{ _.token }}" }
       ]
     },
     {
-      "_id": "fld_budgets",
-      "_type": "request_group",
-      "parentId": "wrk_marcenaria_mvp",
-      "name": "3. Motor de Orçamentos"
-    },
-    {
-      "_id": "req_qa_caixote",
+      "_id": "req_create_budget",
       "_type": "request",
       "parentId": "fld_budgets",
       "name": "QA 1: O Caixote Básico",
@@ -108,7 +165,7 @@
       "url": "{{ _.base_url }}/budgets",
       "body": {
         "mimeType": "application/json",
-        "text": "{\n\t\"client\": \"TESTE QA CAIXOTE\",\n\t\"margin\": 0,\n\t\"extras\": 0,\n\t\"modules\": [\n\t\t{\n\t\t\t\"name\": \"Caixote Teste\",\n\t\t\t\"width\": 1000,\n\t\t\t\"height\": 1000,\n\t\t\t\"depth\": 500,\n\t\t\t\"hasDoors\": false,\n\t\t\t\"drawers\": 0,\n\t\t\t\"partitions\": 0,\n\t\t\t\"shelves\": 0,\n\t\t\t\"isSlattedPanel\": false,\n\t\t\t\"materialId\": \"COLE_AQUI_O_ID_DO_MDF_BRANCO\",\n\t\t\t\"doorMaterialId\": null\n\t\t}\n\t]\n}"
+        "text": "{\n\t\"clientId\": \"COLE_O_ID_DO_CLIENTE_AQUI\",\n\t\"margin\": 30,\n\t\"extras\": 0,\n\t\"modules\": [\n\t\t{\n\t\t\t\"name\": \"Caixote Teste\",\n\t\t\t\"width\": 1000,\n\t\t\t\"height\": 1000,\n\t\t\t\"depth\": 500,\n\t\t\t\"hasDoors\": false,\n\t\t\t\"drawers\": 0,\n\t\t\t\"partitions\": 0,\n\t\t\t\"shelves\": 0,\n\t\t\t\"isSlattedPanel\": false,\n\t\t\t\"materialId\": \"COLE_O_ID_DO_MATERIAL_AQUI\",\n\t\t\t\"doorMaterialId\": null\n\t\t}\n\t]\n}"
       },
       "headers": [
         { "name": "Content-Type", "value": "application/json" },
@@ -116,7 +173,7 @@
       ]
     },
     {
-      "_id": "req_qa_ripado",
+      "_id": "req_create_budget_2",
       "_type": "request",
       "parentId": "fld_budgets",
       "name": "QA 2: Ripado (Prejuízo Zero)",
@@ -124,10 +181,21 @@
       "url": "{{ _.base_url }}/budgets",
       "body": {
         "mimeType": "application/json",
-        "text": "{\n\t\"client\": \"TESTE QA RIPADO\",\n\t\"margin\": 0,\n\t\"extras\": 0,\n\t\"modules\": [\n\t\t{\n\t\t\t\"name\": \"Painel Ripado\",\n\t\t\t\"width\": 1375,\n\t\t\t\"height\": 1840,\n\t\t\t\"depth\": 450,\n\t\t\t\"hasDoors\": false,\n\t\t\t\"drawers\": 0,\n\t\t\t\"partitions\": 0,\n\t\t\t\"shelves\": 0,\n\t\t\t\"isSlattedPanel\": true,\n\t\t\t\"materialId\": \"COLE_AQUI_O_ID_DO_MDF_CARVALHO\",\n\t\t\t\"doorMaterialId\": null\n\t\t}\n\t]\n}"
+        "text": "{\n\t\"clientId\": \"COLE_O_ID_DO_CLIENTE_AQUI\",\n\t\"margin\": 0,\n\t\"extras\": 0,\n\t\"modules\": [\n\t\t{\n\t\t\t\"name\": \"Painel Ripado\",\n\t\t\t\"width\": 1375,\n\t\t\t\"height\": 1840,\n\t\t\t\"depth\": 450,\n\t\t\t\"hasDoors\": false,\n\t\t\t\"drawers\": 0,\n\t\t\t\"partitions\": 0,\n\t\t\t\"shelves\": 0,\n\t\t\t\"isSlattedPanel\": true,\n\t\t\t\"materialId\": \"COLE_O_ID_DO_MATERIAL_AQUI\",\n\t\t\t\"doorMaterialId\": null\n\t\t}\n\t]\n}"
       },
       "headers": [
         { "name": "Content-Type", "value": "application/json" },
+        { "name": "Authorization", "value": "Bearer {{ _.token }}" }
+      ]
+    },
+    {
+      "_id": "req_list_budgets",
+      "_type": "request",
+      "parentId": "fld_budgets",
+      "name": "Listar Meus Orçamentos",
+      "method": "GET",
+      "url": "{{ _.base_url }}/budgets",
+      "headers": [
         { "name": "Authorization", "value": "Bearer {{ _.token }}" }
       ]
     }

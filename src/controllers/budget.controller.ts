@@ -7,6 +7,10 @@ export class BudgetController {
     try {
       // @ts-ignore
       const userId = req.userId;
+      
+      if (!req.body.clientId) {
+        return res.status(400).json({ error: 'O ID do cliente (clientId) é obrigatório.' });
+      }
 
       const budget = await BudgetService.create(userId, req.body);
 

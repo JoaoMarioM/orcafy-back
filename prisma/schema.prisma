@@ -7,7 +7,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -17,6 +16,7 @@ model User {
   name      String?
   settings  Setting?
   materials Material[]
+  clients   Client[]
   budgets   Budget[]
 }
 
@@ -43,15 +43,32 @@ model Material {
   user   User   @relation(fields: [userId], references: [id])
 }
 
+model Client {
+  id        String   @id @default(uuid())
+  name      String
+  email     String?
+  phone     String?
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  budgets Budget[]
+}
+
 model Budget {
   id        String   @id @default(uuid())
-  client    String
   total     Float
   margin    Float
   extras    Float
   status    String   @default("rascunho")
   createdAt DateTime @default(now())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  modules   Json
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  modules Json
 }

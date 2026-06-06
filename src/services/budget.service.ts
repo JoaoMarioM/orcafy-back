@@ -1,4 +1,3 @@
-// src/services/budget.service.ts
 import { AppError } from '../lib/errors';
 import { prisma } from '../lib/prisma';
 
@@ -7,6 +6,24 @@ const HARDWARE_PRICES = {
   hingePrice: 8,
   slidePrice: 35,
   assemblyKit: 25,
+};
+
+const ACCESSORY_PRICES: Record<string, number> = {
+  LED_STRIP: 45.0,
+  SLIDING_SYSTEM: 180.0,
+  MIRROR_DOOR: 450.0,
+  CLOTHES_RAIL: 35.0,
+  PANTS_RACK: 120.0,
+  TRASH_CAN: 180.0,
+  PAPER_HOLDER: 65.0,
+  GLASS_TOP: 250.0,
+  FURNITURE_LEGS: 45.0,
+  UPHOLSTERY: 300.0,
+  GAS_PISTON: 30.0,
+  INVISIBLE_BRACKET: 15.0,
+  POWER_BOX: 85.0,
+  ALUMINUM_PROFILE: 65.0,
+  MACHINED_HANDLE: 25.0,
 };
 
 export class BudgetService {
@@ -26,7 +43,6 @@ export class BudgetService {
 
     const materialMap = new Map(userMaterials.map((m) => [m.id, m]));
 
-    // RASTREADOR: Vai guardar quantos m² de cada MDF foram usados no projeto todo
     const areaPerMaterial = new Map<string, number>();
 
     const computedModules = modules.map((mod: any) => {
@@ -43,7 +59,7 @@ export class BudgetService {
         ? materialMap.get(mod.doorMaterialId)?.pricePerM2 || mdfPrice
         : mdfPrice;
 
-      const w = mod.width / 1000;
+      const w = (mod.width || 0) / 1000;
       const h = mod.height / 1000;
       const d = mod.depth / 1000;
 
@@ -51,45 +67,91 @@ export class BudgetService {
       let mainAreaUsed = 0;
       let doorAreaUsed = 0;
 
-      // 1. CÁLCULO DE ÁREA E CUSTO
-      if (mod.isSlattedPanel) {
-        mainAreaUsed = w * h * 2; // Fator 2x consolidado
+      if (mod.isGermanCorner) {
+        const wA = (mod.widthA || 0) / 1000;
+        const wB = (mod.widthB || 0) / 1000;
+
+        if (wA === 0 || wB === 0) {
+          throw new AppError(
+            'O Canto Alemão exige as medidas das duas paredes (widthA e widthB).',
+            400,
+          );
+        }
+
+        const effectiveWb = Math.max(0, wB - d);
+        const areaA = wA * h * 2 + wA * d * 3;
+        const areaB = effectiveWb * h * 2 + effectiveWb * d * 3;
+        const areaSides = 2 * (h * d);
+
+        mainAreaUsed = areaA + areaB + areaSides;
+        mainAreaUsed = mainAreaUsed * 1.2;
+        cost += mainAreaUsed * mdfPrice;
+
+        const GAS_PISTON_PRICE = 30;
+        cost += 4 * GAS_PISTON_PRICE;
+        cost += 6 * HARDWARE_PRICES.hingePrice;
+
+        const edges = (wA + wB + h * 2) * 2;
+        cost +=
+          edges * HARDWARE_PRICES.edgePrice + HARDWARE_PRICES.assemblyKit * 2;
+      } else if (mod.isSlattedPanel) {
+        mainAreaUsed = w * h * 2;
         cost += mainAreaUsed * mdfPrice;
       } else {
         const shelvesCount = mod.shelves || 0;
         const partitionsCount = mod.partitions || 0;
 
+        const backPanelArea = mod.hasBackPanel !== false ? w * h : 0;
+
         mainAreaUsed =
           2 * (h * d) +
           2 * (w * d) +
-          w * h +
+          backPanelArea +
           shelvesCount * w * d +
           partitionsCount * h * d;
 
-        // Gavetas
         if (mod.drawers > 0) {
           const verticalSpaces = partitionsCount + 1;
           const drawerWidth = w / verticalSpaces;
           const drawerMdfArea = drawerWidth * d * 1.5;
 
           mainAreaUsed += mod.drawers * drawerMdfArea;
-          cost += mod.drawers * (HARDWARE_PRICES.slidePrice + 20); // Ferragem gaveta
+          cost += mod.drawers * (HARDWARE_PRICES.slidePrice + 20);
         }
 
-        // Portas
         if (mod.hasDoors) {
           doorAreaUsed = w * h;
-          cost += HARDWARE_PRICES.hingePrice * 2 + doorAreaUsed * doorMdfPrice;
+
+          const currentDoorType = mod.doorType || 'HINGED';
+
+          if (currentDoorType === 'SLIDING') {
+            const isAlreadyInAccessories =
+              mod.accessories &&
+              mod.accessories.some((a: any) => a.id === 'SLIDING_SYSTEM');
+            const slidingCost = isAlreadyInAccessories
+              ? 0
+              : ACCESSORY_PRICES['SLIDING_SYSTEM'];
+
+            cost += slidingCost + doorAreaUsed * doorMdfPrice;
+          } else {
+            cost +=
+              HARDWARE_PRICES.hingePrice * 2 + doorAreaUsed * doorMdfPrice;
+          }
         }
 
         cost += mainAreaUsed * mdfPrice;
 
-        // Fita e Montagem
         const edges = 2 * (w + h + d);
         cost += edges * HARDWARE_PRICES.edgePrice + HARDWARE_PRICES.assemblyKit;
       }
 
-      // 2. REGISTRA A ÁREA USADA NO RASTREADOR GERAL
+      if (mod.accessories && mod.accessories.length > 0) {
+        mod.accessories.forEach((acc: any) => {
+          const accPrice = ACCESSORY_PRICES[acc.id] || 0;
+          cost += accPrice * acc.quantity;
+        });
+      }
+
       areaPerMaterial.set(
         mod.materialId,
         (areaPerMaterial.get(mod.materialId) || 0) + mainAreaUsed,
@@ -114,37 +176,31 @@ export class BudgetService {
       0,
     );
 
-    // 3. A MÁGICA DO PREJUÍZO ZERO (Corrigida contra bugs de ponto flutuante)
     let extraWasteCost = 0;
 
     areaPerMaterial.forEach((totalAreaUsed, matId) => {
       const mat = materialMap.get(matId);
 
-      // Se o material exige cobrar a chapa inteira e tem a área da chapa cadastrada
       if (mat?.chargeFullSheet && mat?.sheetArea) {
-        // Arredondamento seguro para evitar a "falsa segunda chapa"
         const safeTotalArea = Number(totalAreaUsed.toFixed(4));
-
         const sheetsNeeded = Math.ceil(safeTotalArea / mat.sheetArea);
         const paidArea = sheetsNeeded * mat.sheetArea;
         const wastedArea = paidArea - safeTotalArea;
 
         if (wastedArea > 0) {
-          extraWasteCost += wastedArea * mat.pricePerM2; // Cobra o valor da sobra
+          extraWasteCost += wastedArea * mat.pricePerM2;
         }
       }
     });
 
-    // Soma o custo das sobras de chapa no subtotal ANTES da margem de lucro
     subtotal += extraWasteCost;
-
     const finalTotal = subtotal * (1 + margin / 100) + extras;
 
     return { computedModules, total: Number(finalTotal.toFixed(2)) };
   }
 
   static async create(userId: string, data: any) {
-    const { client, margin, extras, modules } = data;
+    const { clientId, margin, extras, modules } = data;
 
     const { computedModules, total } = await this.runEngine(
       userId,
@@ -155,7 +211,7 @@ export class BudgetService {
 
     const newBudget = await prisma.budget.create({
       data: {
-        client,
+        clientId,
         total,
         margin,
         extras,
@@ -171,6 +227,11 @@ export class BudgetService {
     const budgets = await prisma.budget.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
+      include: {
+        client: {
+          select: { name: true },
+        },
+      },
     });
 
     const currentMaterials = await prisma.material.findMany({
@@ -195,6 +256,9 @@ export class BudgetService {
   static async findById(userId: string, budgetId: string) {
     const budget = await prisma.budget.findUnique({
       where: { id: budgetId },
+      include: {
+        client: true,
+      },
     });
 
     if (!budget || budget.userId !== userId) {
@@ -220,7 +284,7 @@ export class BudgetService {
   static async update(userId: string, budgetId: string, data: any) {
     await this.findById(userId, budgetId);
 
-    const { client, margin, extras, modules } = data;
+    const { clientId, margin, extras, modules } = data;
 
     const { computedModules, total } = await this.runEngine(
       userId,
@@ -231,7 +295,7 @@ export class BudgetService {
 
     return prisma.budget.update({
       where: { id: budgetId },
-      data: { client, total, margin, extras, modules: computedModules },
+      data: { clientId, total, margin, extras, modules: computedModules },
     });
   }
 
