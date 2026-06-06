@@ -44,6 +44,15 @@ export class BudgetService {
     const materialMap = new Map(userMaterials.map((m) => [m.id, m]));
 
     const areaPerMaterial = new Map<string, number>();
+    let totalHinges = 0;
+    let totalDrawerSlides = 0;
+    let totalEdgeMeters = 0;
+    let totalAssemblyKits = 0;
+    let totalGasPistons = 0;
+    const accessoriesTracker = new Map<
+      string,
+      { id: string; name: string; quantity: number }
+    >();
 
     const computedModules = modules.map((mod: any) => {
       const mat = materialMap.get(mod.materialId);
@@ -91,9 +100,15 @@ export class BudgetService {
         cost += 4 * GAS_PISTON_PRICE;
         cost += 6 * HARDWARE_PRICES.hingePrice;
 
+        totalGasPistons += 4;
+        totalHinges += 6;
+
         const edges = (wA + wB + h * 2) * 2;
         cost +=
           edges * HARDWARE_PRICES.edgePrice + HARDWARE_PRICES.assemblyKit * 2;
+
+        totalEdgeMeters += edges;
+        totalAssemblyKits += 2;
       } else if (mod.isSlattedPanel) {
         mainAreaUsed = w * h * 2;
         cost += mainAreaUsed * mdfPrice;
@@ -117,6 +132,8 @@ export class BudgetService {
 
           mainAreaUsed += mod.drawers * drawerMdfArea;
           cost += mod.drawers * (HARDWARE_PRICES.slidePrice + 20);
+
+          totalDrawerSlides += mod.drawers;
         }
 
         if (mod.hasDoors) {
@@ -128,14 +145,25 @@ export class BudgetService {
             const isAlreadyInAccessories =
               mod.accessories &&
               mod.accessories.some((a: any) => a.id === 'SLIDING_SYSTEM');
-            const slidingCost = isAlreadyInAccessories
-              ? 0
-              : ACCESSORY_PRICES['SLIDING_SYSTEM'];
 
-            cost += slidingCost + doorAreaUsed * doorMdfPrice;
+            if (!isAlreadyInAccessories) {
+              const slidingCost = ACCESSORY_PRICES['SLIDING_SYSTEM'] || 0;
+              cost += slidingCost;
+
+              const existing = accessoriesTracker.get('SLIDING_SYSTEM') || {
+                id: 'SLIDING_SYSTEM',
+                name: 'Kit Ferragem Porta de Correr',
+                quantity: 0,
+              };
+              existing.quantity += 1;
+              accessoriesTracker.set('SLIDING_SYSTEM', existing);
+            }
+
+            cost += doorAreaUsed * doorMdfPrice;
           } else {
             cost +=
               HARDWARE_PRICES.hingePrice * 2 + doorAreaUsed * doorMdfPrice;
+            totalHinges += 2;
           }
         }
 
@@ -143,12 +171,23 @@ export class BudgetService {
 
         const edges = 2 * (w + h + d);
         cost += edges * HARDWARE_PRICES.edgePrice + HARDWARE_PRICES.assemblyKit;
+
+        totalEdgeMeters += edges;
+        totalAssemblyKits += 1;
       }
 
       if (mod.accessories && mod.accessories.length > 0) {
         mod.accessories.forEach((acc: any) => {
           const accPrice = ACCESSORY_PRICES[acc.id] || 0;
           cost += accPrice * acc.quantity;
+
+          const existingAcc = accessoriesTracker.get(acc.id) || {
+            id: acc.id,
+            name: acc.name || acc.id,
+            quantity: 0,
+          };
+          existingAcc.quantity += acc.quantity;
+          accessoriesTracker.set(acc.id, existingAcc);
         });
       }
 
@@ -178,17 +217,30 @@ export class BudgetService {
 
     let extraWasteCost = 0;
 
+    const mdfSheets: any[] = [];
+
     areaPerMaterial.forEach((totalAreaUsed, matId) => {
       const mat = materialMap.get(matId);
 
-      if (mat?.chargeFullSheet && mat?.sheetArea) {
+      if (mat) {
         const safeTotalArea = Number(totalAreaUsed.toFixed(4));
-        const sheetsNeeded = Math.ceil(safeTotalArea / mat.sheetArea);
-        const paidArea = sheetsNeeded * mat.sheetArea;
-        const wastedArea = paidArea - safeTotalArea;
+        const sheetArea = mat.sheetArea || 5.06;
+        const sheetsNeeded = Math.ceil(safeTotalArea / sheetArea);
 
-        if (wastedArea > 0) {
-          extraWasteCost += wastedArea * mat.pricePerM2;
+        mdfSheets.push({
+          materialId: mat.id,
+          materialName: mat.name,
+          totalM2: safeTotalArea,
+          sheets: sheetsNeeded,
+        });
+
+        if (mat.chargeFullSheet) {
+          const paidArea = sheetsNeeded * sheetArea;
+          const wastedArea = paidArea - safeTotalArea;
+
+          if (wastedArea > 0) {
+            extraWasteCost += wastedArea * mat.pricePerM2;
+          }
         }
       }
     });
@@ -196,7 +248,23 @@ export class BudgetService {
     subtotal += extraWasteCost;
     const finalTotal = subtotal * (1 + margin / 100) + extras;
 
-    return { computedModules, total: Number(finalTotal.toFixed(2)) };
+    const shoppingList = {
+      mdfSheets,
+      hardware: {
+        hinges: totalHinges,
+        drawerSlides: totalDrawerSlides,
+        edgeBandingMeters: Number(totalEdgeMeters.toFixed(2)),
+        assemblyKits: totalAssemblyKits,
+        gasPistons: totalGasPistons,
+      },
+      accessories: Array.from(accessoriesTracker.values()),
+    };
+
+    return {
+      computedModules,
+      total: Number(finalTotal.toFixed(2)),
+      shoppingList,
+    };
   }
 
   static async create(userId: string, data: any) {
