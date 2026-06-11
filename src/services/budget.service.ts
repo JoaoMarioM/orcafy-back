@@ -96,12 +96,15 @@ export class BudgetService {
         mainAreaUsed = mainAreaUsed * 1.2;
         cost += mainAreaUsed * mdfPrice;
 
-        const GAS_PISTON_PRICE = 30;
-        cost += 4 * GAS_PISTON_PRICE;
-        cost += 6 * HARDWARE_PRICES.hingePrice;
+        const wantsChest = mod.hasChest !== false;
+        if (wantsChest) {
+          const GAS_PISTON_PRICE = 30;
+          cost += 4 * GAS_PISTON_PRICE;
+          cost += 6 * HARDWARE_PRICES.hingePrice;
 
-        totalGasPistons += 4;
-        totalHinges += 6;
+          totalGasPistons += 4;
+          totalHinges += 6;
+        }
 
         const edges = (wA + wB + h * 2) * 2;
         cost +=
@@ -112,6 +115,13 @@ export class BudgetService {
       } else if (mod.isSlattedPanel) {
         mainAreaUsed = w * h * 2;
         cost += mainAreaUsed * mdfPrice;
+      } else if (mod.isLoosePiece) {
+        mainAreaUsed = w * d;
+        cost += mainAreaUsed * mdfPrice;
+
+        const edges = 2 * (w + d);
+        cost += edges * HARDWARE_PRICES.edgePrice;
+        totalEdgeMeters += edges;
       } else {
         const shelvesCount = mod.shelves || 0;
         const partitionsCount = mod.partitions || 0;
@@ -160,6 +170,14 @@ export class BudgetService {
             }
 
             cost += doorAreaUsed * doorMdfPrice;
+          } else if (currentDoorType === 'FLAP') {
+            const GAS_PISTON_PRICE = 30;
+            cost +=
+              HARDWARE_PRICES.hingePrice * 2 + doorAreaUsed * doorMdfPrice;
+            cost += 2 * GAS_PISTON_PRICE;
+
+            totalHinges += 2;
+            totalGasPistons += 2;
           } else {
             cost +=
               HARDWARE_PRICES.hingePrice * 2 + doorAreaUsed * doorMdfPrice;
@@ -333,9 +351,46 @@ export class BudgetService {
       throw new AppError('Orçamento não encontrado.', 404);
     }
 
+    if (
+      !budget.shoppingList &&
+      budget.modules &&
+      (budget.modules as any[]).length > 0
+    ) {
+      try {
+        console.log(
+          `Gerando romaneio retroativo para o orçamento: ${budgetId}`,
+        );
+
+        const margin = budget.margin || 0;
+        const extras = budget.extras || 0;
+
+        const engineResult = await this.runEngine(
+          userId,
+          budget.modules as any[],
+          margin,
+          extras,
+        );
+
+        await prisma.budget.update({
+          where: { id: budgetId },
+          data: {
+            shoppingList: engineResult.shoppingList,
+          },
+        });
+
+        budget.shoppingList = engineResult.shoppingList;
+      } catch (error) {
+        console.error(
+          `Erro ao gerar romaneio retroativo do orçamento ${budgetId}:`,
+          error,
+        );
+      }
+    }
+
     const currentMaterials = await prisma.material.findMany({
       where: { userId },
     });
+
     const currentPrices = new Map(
       currentMaterials.map((m) => [m.id, m.pricePerM2]),
     );

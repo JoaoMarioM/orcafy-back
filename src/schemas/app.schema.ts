@@ -42,7 +42,7 @@ export const budgetSchema = z.object({
           height: z.number().int(),
           depth: z.number().int(),
           hasDoors: z.boolean(),
-          doorType: z.enum(['HINGED', 'SLIDING']).optional(),
+          doorType: z.enum(['HINGED', 'SLIDING', 'FLAP']).optional(),
           drawers: z.number().int(),
           materialId: z.string().uuid(),
           partitions: z.number().optional(),
@@ -51,6 +51,8 @@ export const budgetSchema = z.object({
           isGermanCorner: z.boolean().optional(),
           hasBackPanel: z.boolean().default(true).optional(),
           doorMaterialId: z.string().nullable().optional(),
+          isLoosePiece: z.boolean().optional(),
+          hasChest: z.boolean().optional(),
           accessories: z
             .array(
               z.object({

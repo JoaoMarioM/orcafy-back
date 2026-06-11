@@ -29,15 +29,16 @@ model Setting {
 }
 
 model Material {
-  id              String  @id @default(uuid())
-  name            String
-  thickness       Int
-  pricePerM2      Float
-  sheetArea       Float?
-  chargeFullSheet Boolean @default(false)
-  sheetWidth      Float?
-  sheetLength     Float?
-  sheetPrice      Float?
+  id               String  @id @default(uuid())
+  name             String
+  thickness        Int
+  pricePerM2       Float
+  sheetArea        Float?
+  chargeFullSheet  Boolean @default(false)
+  sheetWidth       Float?
+  sheetLength      Float?
+  sheetPrice       Float?
+  edgeBandingPrice Float   @default(0)
 
   userId String
   user   User   @relation(fields: [userId], references: [id])
@@ -57,12 +58,13 @@ model Client {
 }
 
 model Budget {
-  id        String   @id @default(uuid())
-  total     Float
-  margin    Float
-  extras    Float
-  status    String   @default("rascunho")
-  createdAt DateTime @default(now())
+  id           String   @id @default(uuid())
+  total        Float
+  margin       Float
+  extras       Float
+  status       String   @default("rascunho")
+  createdAt    DateTime @default(now())
+  shoppingList Json?
 
   userId String
   user   User   @relation(fields: [userId], references: [id])
@@ -71,4 +73,12 @@ model Budget {
   client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   modules Json
+}
+
+model Hardware {
+  id       String @id @default(uuid())
+  name     String
+  category String
+  price    Float
+  userId   String
 }
